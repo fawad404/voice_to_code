@@ -408,6 +408,139 @@
     }
     return ast;
   }
+
+   // Semantic Analysis - checks for type correctness and scope resolution
+   function semanticAnalysis(ast) {
+    semanticError.style.display = 'none';
+    const symbolTable = new Map();
+    const errors = [];
+
+    function checkNode(node) {
+      if (node.type === 'VarDeclaration') {
+        if (symbolTable.has(node.identifier)) {
+          errors.push(`Variable "${node.identifier}" already declared.`);
+        } else {
+          symbolTable.set(node.identifier, { type: 'int', initialized: !!node.init });
+        }
+      } else if (node.type === 'AssignmentExpression') {
+        if (!symbolTable.has(node.identifier)) {
+          errors.push(`Variable "${node.identifier}" not declared.`);
+        }
+      }
+    }
+
+    for (const stmt of ast.body) {
+      checkNode(stmt);
+    }
+
+    if (errors.length > 0) {
+      semanticError.textContent = errors.join('\n');
+      semanticError.style.display = 'block';
+      return null;
+    }
+    return symbolTable;
+  }
+
+  // Code Generation - generates simple assembly-like output
+  function generateCode(ast) {
+    if (!ast) return null;
+    const lines = [];
+    for (const stmt of ast.body) {
+      if (stmt.type === 'VarDeclaration') {
+        lines.push(`; Declare variable ${stmt.identifier}`);
+        if (stmt.init) {
+          lines.push(`MOV ${stmt.identifier}, ${stmt.init.value}`);
+        } else {
+          lines.push(`MOV ${stmt.identifier}, 0`);
+        }
+      } else if (stmt.type === 'AssignmentExpression') {
+        lines.push(`; Assign to variable ${stmt.identifier}`);
+        lines.push(`MOV ${stmt.identifier}, ${stmt.expression.value}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  // Update output pipeline on input change for full pipeline with semantic analysis, error handling, and code generation
+  function processCode() {
+    const code = codeInput.value.trim();
+
+    if (!code) {
+      clearOutputs();
+      return;
+    }
+
+    // Lexical analysis
+    const tokens = tokenize(code);
+    if (tokens.length === 0 && lexicalError.style.display !== 'none') {
+      clearFollowingStages();
+      tokensOutput.textContent = '';
+      return;
+    }
+    tokensOutput.textContent = tokens.map(t => `[${t.type}] "${t.value}"`).join('\n');
+
+    // Syntactical analysis & parsing
+    const ast = parse(tokens);
+    if (!ast) {
+      syntaxOutput.textContent = '';
+      astOutput.textContent = '';
+      clearFollowingStages();
+      return;
+    }
+    syntaxOutput.textContent = 'Syntax valid ✔';
+
+    // AST generation
+    astOutput.textContent = JSON.stringify(ast, null, 2);
+
+    // Semantic Analysis
+    const symbols = semanticAnalysis(ast);
+    if (symbols === null) {
+      semanticOutput.textContent = '';
+      codegenOutput.textContent = '';
+      return;
+    }
+    semanticOutput.textContent = `Semantic analysis passed. Declared variables: ${Array.from(symbols.keys()).join(', ')}`;
+
+    // Code generation
+    const codeGen = generateCode(ast);
+    codegenOutput.textContent = codeGen || '';
+  }
+
+  // Clear outputs except code input
+  function clearOutputs() {
+    tokensOutput.textContent = '';
+    lexicalError.style.display = 'none';
+    syntaxOutput.textContent = '';
+    syntaxError.style.display = 'none';
+    astOutput.textContent = '';
+    semanticOutput.textContent = '';
+    semanticError.style.display = 'none';
+    codegenOutput.textContent = '';
+  }
+  // Clear outputs following lexical error
+  function clearFollowingStages() {
+    syntaxOutput.textContent = '';
+    syntaxError.style.display = 'none';
+    astOutput.textContent = '';
+    semanticOutput.textContent = '';
+    semanticError.style.display = 'none';
+    codegenOutput.textContent = '';
+  }
+
+  codeInput.addEventListener('input', () => {
+    lexicalError.style.display = 'none';
+    syntaxError.style.display = 'none';
+    semanticError.style.display = 'none';
+    processCode();
+  });
+
+  // Initial code example for demonstration
+  const exampleCode = `var x = 10;
+var y = 0;
+x = 5;
+`;
+  codeInput.value = exampleCode;
+  processCode();
       </script>
 </body>
 </html>
