@@ -541,6 +541,124 @@ x = 5;
 `;
   codeInput.value = exampleCode;
   processCode();
+
+
+  // Voice Input Setup using Web Speech API
+  let recognition = null;
+  let recognizing = false;
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.addEventListener('start', () => {
+      recognizing = true;
+      voiceBtn.textContent = '';
+      const icon = document.createElement('span');
+      icon.className = 'material-icons';
+      icon.textContent = 'mic';
+      voiceBtn.appendChild(icon);
+      voiceBtn.appendChild(document.createTextNode(' Listening... Click to stop'));
+      voiceBtn.setAttribute('aria-pressed', 'true');
+      voiceBtn.disabled = false;
+    });
+
+    recognition.addEventListener('result', (event) => {
+  if (event.results.length > 0) {
+    let transcript = event.results[0][0].transcript.toLowerCase().trim();
+
+    // Split transcript into commands by "then", "and", or full stops
+    let commands = transcript.split(/\bthen\b|\band\b|[.;]/).map(cmd => cmd.trim()).filter(Boolean);
+
+    const codeStatements = [];
+
+    for (let cmd of commands) {
+      let codeLine = '';
+
+      // Match declare + assign: "assign variable x to 20", "declare variable y with value 10"
+      let declareAssignMatch = cmd.match(/(assign|declare) (variable )?(\w+) (to|with value) (\d+)/);
+      if (declareAssignMatch) {
+        const variable = declareAssignMatch[3];
+        const value = declareAssignMatch[5];
+        codeLine = `var ${variable} = ${value};`;
+      }
+      // Match assign: "x is equals to 5", "x equals 5"
+      else if (cmd.match(/(\w+) (is )?(equals|=) (to )?(\d+)/)) {
+        let assignMatch = cmd.match(/(\w+) (is )?(equals|=) (to )?(\d+)/);
+        const variable = assignMatch[1];
+        const value = assignMatch[5];
+        codeLine = `${variable} = ${value};`;
+      }
+      // Match declare without assign: "declare variable x"
+      else if (cmd.match(/declare (variable )?(\w+)/)) {
+        let declareMatch = cmd.match(/declare (variable )?(\w+)/);
+        const variable = declareMatch[2];
+        codeLine = `var ${variable};`;
+      }
+      // Match function declaration: "function to add numbers"
+      else if (cmd.match(/function (to )?(\w+)/)) {
+        let funcMatch = cmd.match(/function (to )?(\w+)/);
+        let funcName = funcMatch[2];
+        codeLine = `function ${funcName}() {\n  // TODO: implement\n}\n`;
+      }
+      else {
+        // fallback: add as comment
+        codeLine = `// ${cmd}`;
+      }
+
+      codeStatements.push(codeLine);
+    }
+
+    const finalCode = codeStatements.join('\n');
+    codeInput.value += (codeInput.value.endsWith('\n') ? '' : '\n') + finalCode + '\n';
+    processCode();
+  }
+});
+
+
+    recognition.addEventListener('end', () => {
+      recognizing = false;
+      voiceBtn.textContent = '';
+      const icon = document.createElement('span');
+      icon.className = 'material-icons';
+      icon.textContent = 'keyboard_voice';
+      voiceBtn.appendChild(icon);
+      voiceBtn.appendChild(document.createTextNode(' Start Voice Input'));
+      voiceBtn.setAttribute('aria-pressed', 'false');
+      voiceBtn.disabled = false;
+    });
+
+     recognition.addEventListener('error', (event) => {
+       recognizing = false;
+       voiceBtn.textContent = '';
+       const icon = document.createElement('span');
+      icon.className = 'material-icons';
+       icon.textContent = 'keyboard_voice';
+       voiceBtn.appendChild(icon);
+       voiceBtn.appendChild(document.createTextNode(' Start Voice Input'));
+      voiceBtn.setAttribute('aria-pressed', 'false');
+      voiceBtn.disabled = false;
+      alert('Voice recognition error: ' + event.error);
+   });
+
+
+
+
+    voiceBtn.addEventListener('click', () => {
+      if (recognizing) {
+        recognition.stop();
+        voiceBtn.disabled = true;
+      } else {
+        recognition.start();
+        voiceBtn.disabled = true;
+      }
+    });
+  } else {
+    voiceBtn.disabled = true;
+    voiceBtn.textContent = 'Voice input not supported in this browser';
+  }
       </script>
 </body>
 </html>
