@@ -264,5 +264,150 @@
           </section>
         </div>
       </div>
+
+      <script>
+          const codeInput = document.getElementById('code-input');
+  const voiceBtn = document.getElementById('voice-btn');
+  const tokensOutput = document.getElementById('tokens-output');
+  const lexicalError = document.getElementById('lexical-error');
+  const syntaxOutput = document.getElementById('syntax-output');
+  const syntaxError = document.getElementById('syntax-error');
+  const astOutput = document.getElementById('ast-output');
+  const semanticOutput = document.getElementById('semantic-output');
+  const semanticError = document.getElementById('semantic-error');
+  const codegenOutput = document.getElementById('codegen-output');
+
+  // Lexical Analysis - Tokenizer
+  function tokenize(code) {
+    lexicalError.style.display = 'none';
+    const tokens = [];
+    const tokenSpecs = [
+      ['WHITESPACE', /^\s+/],
+      ['NUMBER', /^\d+(\.\d+)?\b/],
+      ['IDENTIFIER', /^[a-zA-Z_]\w*/],
+      ['OPERATOR', /^[+\-*\/=<>!]+/],
+      ['DELIMITER', /^[\(\)\{\};,\.]/],
+      ['STRING', /^"([^"\\]|\\.)*"/],
+      ['UNKNOWN', /^./]
+    ];
+
+    let pos = 0;
+
+    while (pos < code.length) {
+      let match = null;
+      let type = null;
+
+      for (const [tokType, regex] of tokenSpecs) {
+        match = code.slice(pos).match(regex);
+        if (match) {
+          if (tokType !== 'WHITESPACE') {
+            if (tokType === 'UNKNOWN') {
+              lexicalError.textContent = `Unrecognized token starting at "${match[0]}" near position ${pos}.`;
+              lexicalError.style.display = 'block';
+              return [];
+            }
+            tokens.push({ type: tokType, value: match[0] });
+          }
+          pos += match[0].length;
+          break;
+        }
+      }
+      if (!match) {
+        lexicalError.textContent = `Unknown error tokenizing at position ${pos}.`;
+        lexicalError.style.display = 'block';
+        return [];
+      }
+    }
+    return tokens;
+  }
+
+  // Simple parser for demonstration: checks token sequence for simple grammar like variable declarations and assignments
+  function parse(tokens) {
+    syntaxError.style.display = 'none';
+    let pos = 0;
+
+    function expect(type, value = null) {
+      if (pos < tokens.length) {
+        const tok = tokens[pos];
+        if (tok.type === type && (value === null || tok.value === value)) {
+          pos++;
+          return tok;
+        }
+        syntaxError.textContent = `Expected ${value || type} but found ${tok.value} at token ${pos + 1}`;
+        syntaxError.style.display = 'block';
+        throw new Error(syntaxError.textContent);
+      }
+      syntaxError.textContent = `Unexpected end of input, expected ${value || type}`;
+      syntaxError.style.display = 'block';
+      throw new Error(syntaxError.textContent);
+    }
+
+    function parseExpression() {
+      if (pos >= tokens.length) {
+        throw new Error('Unexpected end of input in expression');
+      }
+      const tok = tokens[pos];
+      if (tok.type === 'IDENTIFIER' || tok.type === 'NUMBER') {
+        pos++;
+        return { type: 'Literal', value: tok.value, tokenType: tok.type };
+      } else {
+        throw new Error(`Invalid expression token '${tok.value}' at position ${pos + 1}`);
+      }
+    }
+
+    function parseVarDecl() {
+      expect('IDENTIFIER', 'var');
+      let idTok = expect('IDENTIFIER');
+      let init = null;
+      if (pos < tokens.length && tokens[pos].type === 'OPERATOR' && tokens[pos].value === '=') {
+        pos++;
+        init = parseExpression();
+      }
+      expect('DELIMITER', ';');
+      return { type: 'VarDeclaration', identifier: idTok.value, init };
+    }
+
+    function parseAssignment() {
+      let idTok = expect('IDENTIFIER');
+      expect('OPERATOR', '=');
+      let expr = parseExpression();
+      expect('DELIMITER', ';');
+      return { type: 'AssignmentExpression', identifier: idTok.value, expression: expr };
+    }
+
+    function parseStatement() {
+      if (pos >= tokens.length) return null;
+      const tok = tokens[pos];
+      if (tok.type === 'IDENTIFIER' && tok.value === 'var') {
+        return parseVarDecl();
+      }
+      if (tok.type === 'IDENTIFIER') {
+        // Lookahead for assignment
+        if (pos + 1 < tokens.length && tokens[pos + 1].type === 'OPERATOR' && tokens[pos + 1].value === '=') {
+          return parseAssignment();
+        }
+        syntaxError.textContent = `Unexpected token sequence starting at '${tok.value}', expected assignment or declaration`;
+        syntaxError.style.display = 'block';
+        throw new Error(syntaxError.textContent);
+      }
+      syntaxError.textContent = `Unsupported statement starting at '${tok.value}'`;
+      syntaxError.style.display = 'block';
+      throw new Error(syntaxError.textContent);
+    }
+
+    const ast = { type: 'Program', body: [] };
+
+    try {
+      while (pos < tokens.length) {
+        let stmt = parseStatement();
+        if (stmt === null) break;
+        ast.body.push(stmt);
+      }
+    } catch (e) {
+      return null;
+    }
+    return ast;
+  }
+      </script>
 </body>
 </html>
